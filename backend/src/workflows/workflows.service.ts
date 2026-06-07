@@ -299,8 +299,8 @@ export class WorkflowsService {
     return this.workflowInstanceRepository.save(workflowInstance);
   }
 
-  getExecutionOrder(definitionId: string): string[] {
-    const definition = this.workflowDefinitionRepository.findOne({
+  async getExecutionOrder(definitionId: string): Promise<string[]> {
+    const definition = await this.workflowDefinitionRepository.findOne({
       where: { id: definitionId },
     });
     if (!definition) {

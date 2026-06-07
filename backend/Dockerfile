@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+COPY .npmrc ./
 COPY package*.json ./
 
 RUN npm ci
@@ -15,6 +16,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+
+RUN apk add --no-cache wget
 
 COPY package*.json ./
 

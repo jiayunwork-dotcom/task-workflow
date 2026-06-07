@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+COPY .npmrc ./
 COPY package*.json ./
 
 RUN npm ci

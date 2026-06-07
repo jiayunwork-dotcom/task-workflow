@@ -10,6 +10,7 @@ import { TaskInstancesModule } from './task-instances/task-instances.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { MetricsModule } from './metrics/metrics.module';
     SchedulerModule,
     AuthModule,
     MetricsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
