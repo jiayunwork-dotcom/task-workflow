@@ -8,6 +8,7 @@ import { CronJob } from './entities/cron-job.entity';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { WorkersModule } from '../workers/workers.module';
 import { TaskRecoveryModule } from '../task-recovery/task-recovery.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TaskRecoveryModule } from '../task-recovery/task-recovery.module';
     WorkflowsModule,
     WorkersModule,
     TaskRecoveryModule,
+    AuditLogsModule,
   ],
   controllers: [SchedulerController],
   providers: [SchedulerService, SchedulerTasksService],

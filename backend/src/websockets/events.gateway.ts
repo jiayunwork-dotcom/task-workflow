@@ -6,7 +6,7 @@ import {
   OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { TaskStatus } from '../common/enums';
+import { TaskStatus, AuditLogType, AuditResourceType } from '../common/enums';
 
 export interface TaskStatusChangedPayload {
   taskId: string;
@@ -21,6 +21,19 @@ export interface WorkflowStepChangedPayload {
   oldStatus: string | null;
   newStatus: string;
   timestamp?: number;
+}
+
+export interface AuditLogCreatedPayload {
+  id: string;
+  actionType: AuditLogType;
+  operator: string;
+  resourceId?: string;
+  resourceType?: AuditResourceType;
+  beforeSnapshot?: Record<string, any>;
+  afterSnapshot?: Record<string, any>;
+  ipAddress?: string;
+  durationMs?: number;
+  createdAt: Date;
 }
 
 @WebSocketGateway({
@@ -59,6 +72,13 @@ export class EventsGateway
     this.server.emit('workflow:stepChanged', {
       ...payload,
       timestamp: payload.timestamp || Date.now(),
+    });
+  }
+
+  emitAuditLogCreated(payload: AuditLogCreatedPayload): void {
+    this.server.emit('auditLog:created', {
+      ...payload,
+      timestamp: Date.now(),
     });
   }
 }

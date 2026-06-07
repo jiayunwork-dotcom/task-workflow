@@ -16,11 +16,12 @@ import {
   FailTaskDto,
 } from './dto/task-instance.dto';
 import { PaginationDto, PaginatedResponseDto } from '../common/dto/pagination.dto';
-import { TaskStatus, RetryStrategy } from '../common/enums';
+import { TaskStatus, RetryStrategy, AuditLogType, AuditResourceType } from '../common/enums';
 import { TaskDefinitionsService } from '../task-definitions/task-definitions.service';
 import { QueuesService } from '../queues/queues.service';
 import { WorkersService } from '../workers/workers.service';
 import { EventsGateway } from '../websockets/events.gateway';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class TaskInstancesService {
@@ -33,6 +34,7 @@ export class TaskInstancesService {
     @Inject('REDIS_CLIENT')
     private redis: any,
     private eventsGateway: EventsGateway,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   private emitStatusChanged(
@@ -46,6 +48,28 @@ export class TaskInstancesService {
       newStatus,
       timestamp: Date.now(),
     });
+  }
+
+  private writeAuditLog(
+    actionType: AuditLogType,
+    resourceId: string,
+    beforeSnapshot?: Record<string, any>,
+    afterSnapshot?: Record<string, any>,
+    durationMs?: number,
+  ): void {
+    try {
+      this.auditLogsService.createAsync({
+        actionType,
+        operator: 'system',
+        resourceId,
+        resourceType: AuditResourceType.TASK,
+        beforeSnapshot,
+        afterSnapshot,
+        durationMs,
+      });
+    } catch (e) {
+      // Silently fail - audit log should not affect business logic
+    }
   }
 
   private calculateRetryDelay(
@@ -121,6 +145,12 @@ export class TaskInstancesService {
     );
 
     this.emitStatusChanged(savedTask.id, null, TaskStatus.PENDING);
+    this.writeAuditLog(
+      AuditLogType.TASK_CREATED,
+      savedTask.id,
+      null,
+      { ...savedTask },
+    );
 
     return savedTask;
   }
@@ -186,12 +216,19 @@ export class TaskInstancesService {
         }
 
         const oldStatus = task.status;
+        const beforeSnapshot = { ...task };
         task.status = TaskStatus.CLAIMED;
         task.workerId = workerId;
         task.claimedAt = now;
 
         const savedTask = await this.taskInstanceRepository.save(task);
         this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.CLAIMED);
+        this.writeAuditLog(
+          AuditLogType.TASK_CLAIMED,
+          savedTask.id,
+          beforeSnapshot,
+          { ...savedTask },
+        );
         claimedTasks.push(savedTask);
       } catch (e) {
         await this.queuesService.removeTask(queueName, taskId);
@@ -217,11 +254,18 @@ export class TaskInstancesService {
     }
 
     const oldStatus = task.status;
+    const beforeSnapshot = { ...task };
     task.status = TaskStatus.RUNNING;
     task.startedAt = new Date();
 
     const savedTask = await this.taskInstanceRepository.save(task);
     this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.RUNNING);
+    this.writeAuditLog(
+      AuditLogType.TASK_STARTED,
+      savedTask.id,
+      beforeSnapshot,
+      { ...savedTask },
+    );
     return savedTask;
   }
 
@@ -254,6 +298,8 @@ export class TaskInstancesService {
     }
 
     const oldStatus = task.status;
+    const beforeSnapshot = { ...task };
+    const startTime = Date.now();
     task.status = TaskStatus.SUCCESS;
     task.outputData = completeTaskDto.outputData;
     task.completedAt = new Date();
@@ -267,6 +313,13 @@ export class TaskInstancesService {
 
     const savedTask = await this.taskInstanceRepository.save(task);
     this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.SUCCESS);
+    this.writeAuditLog(
+      AuditLogType.TASK_COMPLETED,
+      savedTask.id,
+      beforeSnapshot,
+      { ...savedTask },
+      Date.now() - startTime,
+    );
     return savedTask;
   }
 
@@ -295,6 +348,8 @@ export class TaskInstancesService {
     await this.queuesService.completeTask(task.queueName, task.id);
 
     const oldStatus = task.status;
+    const beforeSnapshot = { ...task };
+    const startTime = Date.now();
     if (taskDef && task.retries < taskDef.maxRetries) {
       const retryDelay = this.calculateRetryDelay(
         taskDef.retryStrategy,
@@ -320,6 +375,13 @@ export class TaskInstancesService {
       );
 
       this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.PENDING);
+      this.writeAuditLog(
+        AuditLogType.TASK_REQUEUED,
+        savedTask.id,
+        beforeSnapshot,
+        { ...savedTask },
+        Date.now() - startTime,
+      );
       return savedTask;
     } else {
       task.status = TaskStatus.FAILED;
@@ -339,6 +401,13 @@ export class TaskInstancesService {
 
       const savedTask = await this.taskInstanceRepository.save(task);
       this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.FAILED);
+      this.writeAuditLog(
+        AuditLogType.TASK_FAILED,
+        savedTask.id,
+        beforeSnapshot,
+        { ...savedTask },
+        Date.now() - startTime,
+      );
       return savedTask;
     }
   }
@@ -404,6 +473,7 @@ export class TaskInstancesService {
     );
 
     const oldStatus = task.status;
+    const beforeSnapshot = { ...task };
     task.status = TaskStatus.PENDING;
     task.workerId = null;
     task.claimedAt = null;
@@ -422,6 +492,12 @@ export class TaskInstancesService {
     );
 
     this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.PENDING);
+    this.writeAuditLog(
+      AuditLogType.TASK_REQUEUED,
+      savedTask.id,
+      beforeSnapshot,
+      { ...savedTask },
+    );
     return savedTask;
   }
 }

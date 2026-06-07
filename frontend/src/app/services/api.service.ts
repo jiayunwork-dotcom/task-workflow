@@ -13,7 +13,9 @@ import {
   Alert,
   DashboardStats,
   QueueDepthItem,
-  TaskTrendItem
+  TaskTrendItem,
+  AuditLog,
+  AuditLogStats
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -209,5 +211,40 @@ export class ApiService {
     if (params?.page) httpParams = httpParams.set('page', params.page);
     if (params?.size) httpParams = httpParams.set('size', params.size);
     return this.http.get<{ items: CronJobHistory[]; total: number }>(`${this.baseUrl}/cron-jobs/${cronJobId}/history`, { params: httpParams });
+  }
+
+  getAuditLogs(params?: {
+    actionTypes?: string[];
+    startTime?: string;
+    endTime?: string;
+    operator?: string;
+    resourceId?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<{ data: AuditLog[]; total: number; page: number; limit: number; totalPages: number }> {
+    let httpParams = new HttpParams();
+    if (params?.actionTypes && params.actionTypes.length > 0) {
+      params.actionTypes.forEach(type => {
+        httpParams = httpParams.append('actionTypes', type);
+      });
+    }
+    if (params?.startTime) httpParams = httpParams.set('startTime', params.startTime);
+    if (params?.endTime) httpParams = httpParams.set('endTime', params.endTime);
+    if (params?.operator) httpParams = httpParams.set('operator', params.operator);
+    if (params?.resourceId) httpParams = httpParams.set('resourceId', params.resourceId);
+    if (params?.page) httpParams = httpParams.set('page', params.page);
+    if (params?.limit) httpParams = httpParams.set('limit', params.limit);
+    return this.http.get<{ data: AuditLog[]; total: number; page: number; limit: number; totalPages: number }>(`${this.baseUrl}/audit-logs`, { params: httpParams });
+  }
+
+  getAuditLog(id: string): Observable<AuditLog> {
+    return this.http.get<AuditLog>(`${this.baseUrl}/audit-logs/${id}`);
+  }
+
+  getAuditLogStats(startTime: string, endTime: string): Observable<AuditLogStats> {
+    let httpParams = new HttpParams();
+    httpParams = httpParams.set('startTime', startTime);
+    httpParams = httpParams.set('endTime', endTime);
+    return this.http.get<AuditLogStats>(`${this.baseUrl}/audit-logs/stats`, { params: httpParams });
   }
 }

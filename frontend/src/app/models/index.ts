@@ -175,3 +175,74 @@ export interface DagGraph {
   nodes: DagNode[];
   edges: DagEdge[];
 }
+
+export type AuditLogType =
+  | 'TASK_CREATED'
+  | 'TASK_CLAIMED'
+  | 'TASK_STARTED'
+  | 'TASK_COMPLETED'
+  | 'TASK_FAILED'
+  | 'TASK_TIMEOUT'
+  | 'TASK_REQUEUED'
+  | 'WORKFLOW_STARTED'
+  | 'WORKFLOW_COMPLETED'
+  | 'WORKFLOW_CANCELLED'
+  | 'WORKER_ONLINE'
+  | 'WORKER_OFFLINE'
+  | 'QUEUE_PAUSED'
+  | 'QUEUE_RESUMED'
+  | 'CRON_TRIGGERED'
+  | 'USER_LOGIN'
+  | 'USER_LOGOUT'
+  | 'CONFIG_CHANGED';
+
+export type AuditResourceType = 'TASK' | 'WORKFLOW' | 'WORKER' | 'QUEUE' | 'CRON' | 'USER';
+
+export interface AuditLog {
+  id: string;
+  actionType: AuditLogType;
+  operator: string;
+  resourceId?: string;
+  resourceType?: AuditResourceType;
+  beforeSnapshot?: Record<string, any>;
+  afterSnapshot?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+  durationMs?: number;
+  createdAt: string;
+}
+
+export interface ActionTypeCount {
+  actionType: AuditLogType;
+  count: number;
+}
+
+export interface HourlyDistribution {
+  hour: string;
+  count: number;
+}
+
+export interface TopUser {
+  operator: string;
+  count: number;
+}
+
+export interface AuditLogStats {
+  actionTypeCounts: ActionTypeCount[];
+  hourlyDistribution: HourlyDistribution[];
+  topUsers: TopUser[];
+}
+
+export interface AuditLogCreatedEvent {
+  id: string;
+  actionType: AuditLogType;
+  operator: string;
+  resourceId?: string;
+  resourceType?: AuditResourceType;
+  beforeSnapshot?: Record<string, any>;
+  afterSnapshot?: Record<string, any>;
+  ipAddress?: string;
+  durationMs?: number;
+  createdAt: string;
+  timestamp: number;
+}

@@ -2,6 +2,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../environments/environment';
+import { AuditLogCreatedEvent } from '../models';
 
 export interface TaskStatusChangedEvent {
   taskId: string;
@@ -25,11 +26,13 @@ export class RealtimeService implements OnDestroy {
   private taskUpdateSubject = new Subject<void>();
   private taskStatusChangedSubject = new Subject<TaskStatusChangedEvent>();
   private workflowStepChangedSubject = new Subject<WorkflowStepChangedEvent>();
+  private auditLogCreatedSubject = new Subject<AuditLogCreatedEvent>();
 
   dashboardUpdate$ = this.dashboardUpdateSubject.asObservable();
   taskUpdate$ = this.taskUpdateSubject.asObservable();
   taskStatusChanged$ = this.taskStatusChangedSubject.asObservable();
   workflowStepChanged$ = this.workflowStepChangedSubject.asObservable();
+  auditLogCreated$ = this.auditLogCreatedSubject.asObservable();
 
   constructor() {}
 
@@ -73,6 +76,12 @@ export class RealtimeService implements OnDestroy {
     this.socket.on('workflow:stepChanged', (data: WorkflowStepChangedEvent) => {
       console.log('Workflow step changed:', data);
       this.workflowStepChangedSubject.next(data);
+      this.dashboardUpdateSubject.next();
+    });
+
+    this.socket.on('auditLog:created', (data: AuditLogCreatedEvent) => {
+      console.log('Audit log created:', data);
+      this.auditLogCreatedSubject.next(data);
       this.dashboardUpdateSubject.next();
     });
   }

@@ -95,6 +95,7 @@ export class SidebarComponent {
     { label: '任务列表', icon: 'list_alt', route: '/tasks' },
     { label: '队列管理', icon: 'queue', route: '/queues' },
     { label: 'Worker监控', icon: 'memory', route: '/workers' },
-    { label: '定时任务', icon: 'schedule', route: '/cron-jobs' }
+    { label: '定时任务', icon: 'schedule', route: '/cron-jobs' },
+    { label: '审计日志', icon: 'policy', route: '/audit-logs' }
   ];
 }

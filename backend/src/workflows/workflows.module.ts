@@ -5,11 +5,13 @@ import { WorkflowsController } from './workflows.controller';
 import { WorkflowDefinition } from './entities/workflow-definition.entity';
 import { WorkflowInstance } from './entities/workflow-instance.entity';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WorkflowDefinition, WorkflowInstance]),
     WebsocketsModule,
+    AuditLogsModule,
   ],
   controllers: [WorkflowsController],
   providers: [WorkflowsService],

@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { HealthModule } from './health/health.module';
 import { WebsocketsModule } from './websockets/websockets.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { WebsocketsModule } from './websockets/websockets.module';
     MetricsModule,
     HealthModule,
     WebsocketsModule,
+    AuditLogsModule,
   ],
 })
 export class AppModule {}

@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { SchedulerService } from './scheduler.service';
 import { WorkersService } from '../workers/workers.service';
 import { TaskRecoveryService } from '../task-recovery/task-recovery.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class SchedulerTasksService {
@@ -12,6 +13,7 @@ export class SchedulerTasksService {
     private schedulerService: SchedulerService,
     private workersService: WorkersService,
     private taskRecoveryService: TaskRecoveryService,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   @Cron(CronExpression.EVERY_SECOND)
@@ -56,6 +58,17 @@ export class SchedulerTasksService {
       await this.schedulerService.cleanupCompletedJobs();
     } catch (e) {
       this.logger.error(`Error cleaning up completed jobs: ${e.message}`);
+    }
+  }
+
+  @Cron('0 3 * * *')
+  async archiveOldAuditLogs() {
+    try {
+      this.logger.log('Starting daily audit log archive task');
+      const archivedCount = await this.auditLogsService.archiveOldLogs(90);
+      this.logger.log(`Audit log archive completed, archived ${archivedCount} records`);
+    } catch (e) {
+      this.logger.error(`Error archiving old audit logs: ${e.message}`);
     }
   }
 }

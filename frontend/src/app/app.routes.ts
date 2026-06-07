@@ -7,6 +7,7 @@ import { TasksComponent } from './pages/tasks/tasks.component';
 import { QueuesComponent } from './pages/queues/queues.component';
 import { WorkersComponent } from './pages/workers/workers.component';
 import { CronJobsComponent } from './pages/cron-jobs/cron-jobs.component';
+import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 import { AuthGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -21,7 +22,8 @@ export const routes: Routes = [
       { path: 'tasks', component: TasksComponent },
       { path: 'queues', component: QueuesComponent },
       { path: 'workers', component: WorkersComponent },
-      { path: 'cron-jobs', component: CronJobsComponent }
+      { path: 'cron-jobs', component: CronJobsComponent },
+      { path: 'audit-logs', component: AuditLogsComponent }
     ]
   },
   { path: '**', redirectTo: '' }

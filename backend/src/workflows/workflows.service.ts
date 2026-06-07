@@ -20,8 +20,9 @@ import {
   UpdateStepStatusDto,
 } from './dto/workflow.dto';
 import { PaginationDto, PaginatedResponseDto } from '../common/dto/pagination.dto';
-import { WorkflowStatus, StepStatus } from '../common/enums';
+import { WorkflowStatus, StepStatus, AuditLogType, AuditResourceType } from '../common/enums';
 import { EventsGateway } from '../websockets/events.gateway';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class WorkflowsService {
@@ -31,6 +32,7 @@ export class WorkflowsService {
     @InjectRepository(WorkflowInstance)
     private workflowInstanceRepository: Repository<WorkflowInstance>,
     private eventsGateway: EventsGateway,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   private emitStepChanged(
@@ -46,6 +48,26 @@ export class WorkflowsService {
       newStatus,
       timestamp: Date.now(),
     });
+  }
+
+  private writeAuditLog(
+    actionType: AuditLogType,
+    resourceId: string,
+    beforeSnapshot?: Record<string, any>,
+    afterSnapshot?: Record<string, any>,
+  ): void {
+    try {
+      this.auditLogsService.createAsync({
+        actionType,
+        operator: 'system',
+        resourceId,
+        resourceType: AuditResourceType.WORKFLOW,
+        beforeSnapshot,
+        afterSnapshot,
+      });
+    } catch (e) {
+      // Silently fail - audit log should not affect business logic
+    }
   }
 
   private buildDag(steps: Step[]): Record<string, string[]> {
@@ -254,7 +276,14 @@ export class WorkflowsService {
       startedAt: new Date(),
     });
 
-    return this.workflowInstanceRepository.save(workflowInstance);
+    const saved = await this.workflowInstanceRepository.save(workflowInstance);
+    this.writeAuditLog(
+      AuditLogType.WORKFLOW_STARTED,
+      saved.id,
+      null,
+      { ...saved },
+    );
+    return saved;
   }
 
   async findAllInstances(
@@ -306,6 +335,7 @@ export class WorkflowsService {
       );
     }
 
+    const beforeSnapshot = { ...workflowInstance };
     workflowInstance.status = WorkflowStatus.CANCELLED;
     workflowInstance.completedAt = new Date();
 
@@ -317,7 +347,14 @@ export class WorkflowsService {
       }
     }
 
-    return this.workflowInstanceRepository.save(workflowInstance);
+    const saved = await this.workflowInstanceRepository.save(workflowInstance);
+    this.writeAuditLog(
+      AuditLogType.WORKFLOW_CANCELLED,
+      saved.id,
+      beforeSnapshot,
+      { ...saved },
+    );
+    return saved;
   }
 
   async updateStepStatus(
