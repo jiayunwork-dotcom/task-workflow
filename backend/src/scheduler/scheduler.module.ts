@@ -7,6 +7,7 @@ import { SchedulerController } from './scheduler.controller';
 import { CronJob } from './entities/cron-job.entity';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { WorkersModule } from '../workers/workers.module';
+import { TaskRecoveryModule } from '../task-recovery/task-recovery.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { WorkersModule } from '../workers/workers.module';
     ScheduleModule.forRoot(),
     WorkflowsModule,
     WorkersModule,
+    TaskRecoveryModule,
   ],
   controllers: [SchedulerController],
   providers: [SchedulerService, SchedulerTasksService],

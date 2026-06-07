@@ -87,3 +87,23 @@ export class StartWorkflowDto {
   @IsObject()
   inputData?: Record<string, any>;
 }
+
+export class UpdateStepStatusDto {
+  @IsString()
+  stepId: string;
+
+  @IsString()
+  status: string;
+
+  @IsOptional()
+  @IsObject()
+  output?: any;
+
+  @IsOptional()
+  @IsString()
+  error?: string;
+
+  @IsOptional()
+  @IsString()
+  taskInstanceId?: string;
+}

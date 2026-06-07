@@ -19,7 +19,7 @@ import { Task } from '../../models';
 import { MockDataService } from '../../services/mock-data.service';
 import { DateFormatPipe, RelativeTimePipe } from '../../pipes/date-format.pipe';
 import { TaskStatusPipe, StatusColorPipe } from '../../pipes/status.pipe';
-import { RealtimeService } from '../../services/realtime.service';
+import { RealtimeService, TaskStatusChangedEvent } from '../../services/realtime.service';
 
 interface TabItem {
   label: string;
@@ -258,6 +258,19 @@ export class TasksComponent implements OnInit, OnDestroy {
     this.realtimeService.taskUpdate$
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => this.loadTasks());
+
+    this.realtimeService.taskStatusChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event: TaskStatusChangedEvent) => {
+        this.updateTaskStatus(event);
+      });
+  }
+
+  private updateTaskStatus(event: TaskStatusChangedEvent): void {
+    const task = this.tasks.find(t => t.id === event.taskId);
+    if (task) {
+      task.status = event.newStatus.toUpperCase();
+    }
   }
 
   ngOnDestroy(): void {

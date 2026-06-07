@@ -20,6 +20,7 @@ import { TaskStatus, RetryStrategy } from '../common/enums';
 import { TaskDefinitionsService } from '../task-definitions/task-definitions.service';
 import { QueuesService } from '../queues/queues.service';
 import { WorkersService } from '../workers/workers.service';
+import { EventsGateway } from '../websockets/events.gateway';
 
 @Injectable()
 export class TaskInstancesService {
@@ -31,7 +32,21 @@ export class TaskInstancesService {
     private workersService: WorkersService,
     @Inject('REDIS_CLIENT')
     private redis: any,
+    private eventsGateway: EventsGateway,
   ) {}
+
+  private emitStatusChanged(
+    taskId: string,
+    oldStatus: TaskStatus | null,
+    newStatus: TaskStatus,
+  ): void {
+    this.eventsGateway.emitTaskStatusChanged({
+      taskId,
+      oldStatus,
+      newStatus,
+      timestamp: Date.now(),
+    });
+  }
 
   private calculateRetryDelay(
     retryStrategy: RetryStrategy,
@@ -105,6 +120,8 @@ export class TaskInstancesService {
       savedTask.delayedUntil,
     );
 
+    this.emitStatusChanged(savedTask.id, null, TaskStatus.PENDING);
+
     return savedTask;
   }
 
@@ -168,11 +185,13 @@ export class TaskInstancesService {
           continue;
         }
 
+        const oldStatus = task.status;
         task.status = TaskStatus.CLAIMED;
         task.workerId = workerId;
         task.claimedAt = now;
 
         const savedTask = await this.taskInstanceRepository.save(task);
+        this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.CLAIMED);
         claimedTasks.push(savedTask);
       } catch (e) {
         await this.queuesService.removeTask(queueName, taskId);
@@ -197,10 +216,13 @@ export class TaskInstancesService {
       );
     }
 
+    const oldStatus = task.status;
     task.status = TaskStatus.RUNNING;
     task.startedAt = new Date();
 
-    return this.taskInstanceRepository.save(task);
+    const savedTask = await this.taskInstanceRepository.save(task);
+    this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.RUNNING);
+    return savedTask;
   }
 
   async updateProgress(
@@ -231,6 +253,7 @@ export class TaskInstancesService {
       );
     }
 
+    const oldStatus = task.status;
     task.status = TaskStatus.SUCCESS;
     task.outputData = completeTaskDto.outputData;
     task.completedAt = new Date();
@@ -242,7 +265,9 @@ export class TaskInstancesService {
       await this.workersService.incrementProcessedTasks(task.workerId);
     }
 
-    return this.taskInstanceRepository.save(task);
+    const savedTask = await this.taskInstanceRepository.save(task);
+    this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.SUCCESS);
+    return savedTask;
   }
 
   async failTask(
@@ -269,6 +294,7 @@ export class TaskInstancesService {
 
     await this.queuesService.completeTask(task.queueName, task.id);
 
+    const oldStatus = task.status;
     if (taskDef && task.retries < taskDef.maxRetries) {
       const retryDelay = this.calculateRetryDelay(
         taskDef.retryStrategy,
@@ -293,6 +319,7 @@ export class TaskInstancesService {
         delayedUntil,
       );
 
+      this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.PENDING);
       return savedTask;
     } else {
       task.status = TaskStatus.FAILED;
@@ -310,7 +337,9 @@ export class TaskInstancesService {
         await this.workersService.incrementProcessedTasks(task.workerId);
       }
 
-      return this.taskInstanceRepository.save(task);
+      const savedTask = await this.taskInstanceRepository.save(task);
+      this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.FAILED);
+      return savedTask;
     }
   }
 
@@ -327,12 +356,15 @@ export class TaskInstancesService {
       );
     }
 
+    const oldStatus = task.status;
     task.status = TaskStatus.CANCELLED;
     task.completedAt = new Date();
 
     await this.queuesService.removeTask(task.queueName, task.id);
 
-    return this.taskInstanceRepository.save(task);
+    const savedTask = await this.taskInstanceRepository.save(task);
+    this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.CANCELLED);
+    return savedTask;
   }
 
   async remove(id: string): Promise<void> {
@@ -371,6 +403,7 @@ export class TaskInstancesService {
       (d) => d.version === task.taskVersion,
     );
 
+    const oldStatus = task.status;
     task.status = TaskStatus.PENDING;
     task.workerId = null;
     task.claimedAt = null;
@@ -388,6 +421,7 @@ export class TaskInstancesService {
       taskDef?.priority || 0,
     );
 
+    this.emitStatusChanged(savedTask.id, oldStatus, TaskStatus.PENDING);
     return savedTask;
   }
 }

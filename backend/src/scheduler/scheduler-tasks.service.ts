@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SchedulerService } from './scheduler.service';
 import { WorkersService } from '../workers/workers.service';
+import { TaskRecoveryService } from '../task-recovery/task-recovery.service';
 
 @Injectable()
 export class SchedulerTasksService {
@@ -10,6 +11,7 @@ export class SchedulerTasksService {
   constructor(
     private schedulerService: SchedulerService,
     private workersService: WorkersService,
+    private taskRecoveryService: TaskRecoveryService,
   ) {}
 
   @Cron(CronExpression.EVERY_SECOND)
@@ -27,6 +29,24 @@ export class SchedulerTasksService {
       await this.workersService.checkAndMarkDisconnected();
     } catch (e) {
       this.logger.error(`Error checking disconnected workers: ${e.message}`);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async recoverTimedOutTasks() {
+    try {
+      await this.taskRecoveryService.recoverTimedOutTasks();
+    } catch (e) {
+      this.logger.error(`Error recovering timed out tasks: ${e.message}`);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async checkWorkerHeartbeats() {
+    try {
+      await this.taskRecoveryService.checkWorkerHeartbeats();
+    } catch (e) {
+      this.logger.error(`Error checking worker heartbeats: ${e.message}`);
     }
   }
 

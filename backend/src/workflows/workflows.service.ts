@@ -11,14 +11,17 @@ import { WorkflowDefinition, Step } from './entities/workflow-definition.entity'
 import {
   WorkflowInstance,
   StepsStatusMap,
+  StepStatusInfo,
 } from './entities/workflow-instance.entity';
 import {
   CreateWorkflowDefinitionDto,
   UpdateWorkflowDefinitionDto,
   StartWorkflowDto,
+  UpdateStepStatusDto,
 } from './dto/workflow.dto';
 import { PaginationDto, PaginatedResponseDto } from '../common/dto/pagination.dto';
 import { WorkflowStatus, StepStatus } from '../common/enums';
+import { EventsGateway } from '../websockets/events.gateway';
 
 @Injectable()
 export class WorkflowsService {
@@ -27,7 +30,23 @@ export class WorkflowsService {
     private workflowDefinitionRepository: Repository<WorkflowDefinition>,
     @InjectRepository(WorkflowInstance)
     private workflowInstanceRepository: Repository<WorkflowInstance>,
+    private eventsGateway: EventsGateway,
   ) {}
+
+  private emitStepChanged(
+    workflowInstanceId: string,
+    stepId: string,
+    oldStatus: string | null,
+    newStatus: string,
+  ): void {
+    this.eventsGateway.emitWorkflowStepChanged({
+      workflowInstanceId,
+      stepId,
+      oldStatus,
+      newStatus,
+      timestamp: Date.now(),
+    });
+  }
 
   private buildDag(steps: Step[]): Record<string, string[]> {
     const dag: Record<string, string[]> = {};
@@ -292,11 +311,59 @@ export class WorkflowsService {
 
     for (const stepId of Object.keys(workflowInstance.stepsStatus)) {
       if (workflowInstance.stepsStatus[stepId].status === StepStatus.PENDING) {
+        const oldStatus = workflowInstance.stepsStatus[stepId].status;
         workflowInstance.stepsStatus[stepId].status = StepStatus.SKIPPED;
+        this.emitStepChanged(id, stepId, oldStatus, StepStatus.SKIPPED);
       }
     }
 
     return this.workflowInstanceRepository.save(workflowInstance);
+  }
+
+  async updateStepStatus(
+    instanceId: string,
+    updateStepStatusDto: UpdateStepStatusDto,
+  ): Promise<WorkflowInstance> {
+    const workflowInstance = await this.findOneInstance(instanceId);
+    const { stepId, status, output, error, taskInstanceId } = updateStepStatusDto;
+
+    if (!workflowInstance.stepsStatus[stepId]) {
+      throw new NotFoundException(`Step "${stepId}" not found in workflow instance`);
+    }
+
+    const oldStatus = workflowInstance.stepsStatus[stepId].status;
+    const stepStatusInfo: StepStatusInfo = {
+      ...workflowInstance.stepsStatus[stepId],
+      status: status as StepStatus,
+    };
+
+    if (output !== undefined) {
+      stepStatusInfo.output = output;
+    }
+    if (error !== undefined) {
+      stepStatusInfo.error = error;
+    }
+    if (taskInstanceId !== undefined) {
+      stepStatusInfo.taskInstanceId = taskInstanceId;
+    }
+
+    if (status === StepStatus.RUNNING && !stepStatusInfo.startedAt) {
+      stepStatusInfo.startedAt = new Date();
+    }
+    if (
+      [StepStatus.SUCCESS, StepStatus.FAILED, StepStatus.SKIPPED].includes(
+        status as StepStatus,
+      ) &&
+      !stepStatusInfo.completedAt
+    ) {
+      stepStatusInfo.completedAt = new Date();
+    }
+
+    workflowInstance.stepsStatus[stepId] = stepStatusInfo;
+
+    const saved = await this.workflowInstanceRepository.save(workflowInstance);
+    this.emitStepChanged(instanceId, stepId, oldStatus, status);
+    return saved;
   }
 
   async getExecutionOrder(definitionId: string): Promise<string[]> {

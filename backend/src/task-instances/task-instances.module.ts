@@ -6,6 +6,7 @@ import { TaskInstance } from './entities/task-instance.entity';
 import { TaskDefinitionsModule } from '../task-definitions/task-definitions.module';
 import { QueuesModule } from '../queues/queues.module';
 import { WorkersModule } from '../workers/workers.module';
+import { WebsocketsModule } from '../websockets/websockets.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { WorkersModule } from '../workers/workers.module';
     TaskDefinitionsModule,
     QueuesModule,
     WorkersModule,
+    WebsocketsModule,
   ],
   controllers: [TaskInstancesController],
   providers: [TaskInstancesService],

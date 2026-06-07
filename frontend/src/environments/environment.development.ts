@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
   apiBaseUrl: '/api',
-  wsUrl: '/ws',
+  wsUrl: '/',
   pollingInterval: 3000
 };

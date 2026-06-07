@@ -15,6 +15,7 @@ import {
   CreateWorkflowDefinitionDto,
   UpdateWorkflowDefinitionDto,
   StartWorkflowDto,
+  UpdateStepStatusDto,
 } from './dto/workflow.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { WorkflowStatus } from '../common/enums';
@@ -87,5 +88,13 @@ export class WorkflowsController {
   @Post('instances/:id/cancel')
   cancelInstance(@Param('id') id: string) {
     return this.workflowsService.cancelInstance(id);
+  }
+
+  @Patch('instances/:id/steps')
+  updateStepStatus(
+    @Param('id') id: string,
+    @Body() updateStepStatusDto: UpdateStepStatusDto,
+  ) {
+    return this.workflowsService.updateStepStatus(id, updateStepStatusDto);
   }
 }
