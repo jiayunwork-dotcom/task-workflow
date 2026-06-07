@@ -17,7 +17,6 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { FormsModule } from '@angular/forms';
 import {
   NgChartsModule,
-  ChartConfiguration,
 } from 'ng2-charts';
 import { ChartOptions, ChartType, ChartData } from 'chart.js';
 import { ApiService } from '../../services/api.service';
@@ -31,6 +30,12 @@ interface FilterParams {
   endTime?: Date;
   operator: string;
   resourceId: string;
+}
+
+interface DiffLine {
+  key: string;
+  value: string;
+  type: 'unchanged' | 'added' | 'removed' | 'modified';
 }
 
 const ACTION_TYPE_COLORS: Record<AuditLogType, string> = {
@@ -282,13 +287,38 @@ const RESOURCE_TYPE_LABELS: Record<AuditResourceType, string> = {
                 <div class="snapshot-container">
                   <div class="snapshot-panel">
                     <h4>操作前</h4>
-                    <pre class="snapshot-json">{{ formatJson(log.beforeSnapshot) }}</pre>
+                    <div class="snapshot-json">
+                      <div
+                        *ngFor="let line of getBeforeDiffLines(log)"
+                        class="diff-line"
+                        [class.diff-added]="line.type === 'added'"
+                        [class.diff-removed]="line.type === 'removed'"
+                        [class.diff-modified]="line.type === 'modified'">
+                        <span class="diff-key">{{ line.key }}:</span>
+                        <span class="diff-value">{{ line.value }}</span>
+                      </div>
+                    </div>
                   </div>
                   <div class="snapshot-divider"></div>
                   <div class="snapshot-panel">
                     <h4>操作后</h4>
-                    <pre class="snapshot-json">{{ formatJson(log.afterSnapshot) }}</pre>
+                    <div class="snapshot-json">
+                      <div
+                        *ngFor="let line of getAfterDiffLines(log)"
+                        class="diff-line"
+                        [class.diff-added]="line.type === 'added'"
+                        [class.diff-removed]="line.type === 'removed'"
+                        [class.diff-modified]="line.type === 'modified'">
+                        <span class="diff-key">{{ line.key }}:</span>
+                        <span class="diff-value">{{ line.value }}</span>
+                      </div>
+                    </div>
                   </div>
+                </div>
+                <div class="diff-legend">
+                  <span class="legend-item"><span class="legend-box diff-removed"></span>已删除</span>
+                  <span class="legend-item"><span class="legend-box diff-added"></span>已新增</span>
+                  <span class="legend-item"><span class="legend-box diff-modified"></span>已修改</span>
                 </div>
                 <div class="detail-meta" *ngIf="log.ipAddress || log.userAgent">
                   <span *ngIf="log.ipAddress">IP: {{ log.ipAddress }}</span>
@@ -440,7 +470,7 @@ const RESOURCE_TYPE_LABELS: Record<AuditResourceType, string> = {
       display: grid;
       grid-template-columns: 1fr 40px 1fr;
       gap: 16px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
     .snapshot-panel {
       background: #fff;
@@ -457,13 +487,47 @@ const RESOURCE_TYPE_LABELS: Record<AuditResourceType, string> = {
     .snapshot-json {
       margin: 0;
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.6;
       color: #334155;
       max-height: 300px;
       overflow: auto;
       background: #f8fafc;
       padding: 8px;
       border-radius: 4px;
+    }
+    .diff-line {
+      padding: 1px 4px;
+      border-radius: 2px;
+      margin: 1px 0;
+    }
+    .diff-key {
+      color: #7c3aed;
+      margin-right: 4px;
+    }
+    .diff-value {
+      color: #0369a1;
+    }
+    .diff-added {
+      background-color: #dcfce7;
+    }
+    .diff-added .diff-key,
+    .diff-added .diff-value {
+      color: #166534;
+    }
+    .diff-removed {
+      background-color: #fee2e2;
+      text-decoration: line-through;
+    }
+    .diff-removed .diff-key,
+    .diff-removed .diff-value {
+      color: #991b1b;
+    }
+    .diff-modified {
+      background-color: #fef9c3;
+    }
+    .diff-modified .diff-key,
+    .diff-modified .diff-value {
+      color: #854d0e;
     }
     .snapshot-divider {
       display: flex;
@@ -474,6 +538,27 @@ const RESOURCE_TYPE_LABELS: Record<AuditResourceType, string> = {
     .snapshot-divider::before {
       content: '→';
       font-size: 20px;
+    }
+    .diff-legend {
+      display: flex;
+      gap: 16px;
+      padding: 8px 12px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #64748b;
+    }
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
     }
     .detail-meta {
       display: flex;
@@ -567,6 +652,8 @@ export class AuditLogsComponent implements OnInit, OnDestroy {
     }
   };
 
+  private diffCache = new Map<string, { before: DiffLine[]; after: DiffLine[] }>();
+
   constructor(
     private apiService: ApiService,
     private realtimeService: RealtimeService,
@@ -614,6 +701,7 @@ export class AuditLogsComponent implements OnInit, OnDestroy {
     this.apiService.getAuditLogs(params).subscribe(result => {
       this.auditLogs = result.data;
       this.total = result.total;
+      this.diffCache.clear();
       this.cdr.detectChanges();
     });
   }
@@ -625,9 +713,12 @@ export class AuditLogsComponent implements OnInit, OnDestroy {
     const endTime = new Date();
 
     this.apiService.getAuditLogStats(weekStart.toISOString(), endTime.toISOString()).subscribe(stats => {
-      const todayStartStr = todayStart.toISOString();
+      const todayDateStr = this.formatDateForCompare(todayStart);
       this.todayCount = stats.hourlyDistribution
-        .filter(h => h.hour >= todayStartStr.slice(0, 13))
+        .filter(h => {
+          const hourDateStr = h.hour.slice(0, 10);
+          return hourDateStr === todayDateStr;
+        })
         .reduce((sum, h) => sum + h.count, 0);
 
       this.weekCount = stats.hourlyDistribution.reduce((sum, h) => sum + h.count, 0);
@@ -647,6 +738,13 @@ export class AuditLogsComponent implements OnInit, OnDestroy {
       this.updateLineChart(stats.hourlyDistribution);
       this.cdr.detectChanges();
     });
+  }
+
+  private formatDateForCompare(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   updateDoughnutChart(actionTypeCounts: { actionType: AuditLogType; count: number }[]): void {
@@ -705,13 +803,65 @@ export class AuditLogsComponent implements OnInit, OnDestroy {
     this.expandedRow = this.expandedRow === row ? null : row;
   }
 
-  formatJson(obj: any): string {
-    if (!obj) return '{}';
-    try {
-      return JSON.stringify(obj, null, 2);
-    } catch {
-      return String(obj);
+  private computeDiff(log: AuditLog): { before: DiffLine[]; after: DiffLine[] } {
+    if (this.diffCache.has(log.id)) {
+      return this.diffCache.get(log.id)!;
     }
+
+    const before = log.beforeSnapshot || {};
+    const after = log.afterSnapshot || {};
+
+    const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+
+    const beforeLines: DiffLine[] = [];
+    const afterLines: DiffLine[] = [];
+
+    for (const key of Array.from(allKeys).sort()) {
+      const beforeVal = before[key];
+      const afterVal = after[key];
+
+      const beforeStr = this.stringifyValue(beforeVal);
+      const afterStr = this.stringifyValue(afterVal);
+
+      if (!(key in before)) {
+        afterLines.push({ key, value: afterStr, type: 'added' });
+        beforeLines.push({ key, value: '', type: 'added' });
+      } else if (!(key in after)) {
+        beforeLines.push({ key, value: beforeStr, type: 'removed' });
+        afterLines.push({ key, value: '', type: 'removed' });
+      } else if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
+        beforeLines.push({ key, value: beforeStr, type: 'modified' });
+        afterLines.push({ key, value: afterStr, type: 'modified' });
+      } else {
+        beforeLines.push({ key, value: beforeStr, type: 'unchanged' });
+        afterLines.push({ key, value: afterStr, type: 'unchanged' });
+      }
+    }
+
+    const result = { before: beforeLines, after: afterLines };
+    this.diffCache.set(log.id, result);
+    return result;
+  }
+
+  private stringifyValue(val: any): string {
+    if (val === undefined) return 'undefined';
+    if (val === null) return 'null';
+    if (typeof val === 'object') {
+      try {
+        return JSON.stringify(val);
+      } catch {
+        return String(val);
+      }
+    }
+    return String(val);
+  }
+
+  getBeforeDiffLines(log: AuditLog): DiffLine[] {
+    return this.computeDiff(log).before;
+  }
+
+  getAfterDiffLines(log: AuditLog): DiffLine[] {
+    return this.computeDiff(log).after;
   }
 
   handleNewAuditLog(event: AuditLogCreatedEvent): void {

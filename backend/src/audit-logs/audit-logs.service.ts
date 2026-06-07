@@ -54,6 +54,10 @@ export class AuditLogsService {
   ): Promise<PaginatedResponseDto<AuditLog>> {
     const { page, limit, actionTypes, startTime, endTime, operator, resourceId } = queryDto;
 
+    if ((startTime && !endTime) || (!startTime && endTime)) {
+      throw new BadRequestException('startTime and endTime must be provided together');
+    }
+
     if (startTime && endTime && new Date(startTime) > new Date(endTime)) {
       throw new BadRequestException('startTime cannot be later than endTime');
     }
@@ -66,11 +70,6 @@ export class AuditLogsService {
 
     if (startTime && endTime) {
       where.createdAt = Between(new Date(startTime), new Date(endTime));
-    } else if (startTime) {
-      where.createdAt = Between(new Date(startTime), new Date());
-    } else if (endTime) {
-      const epoch = new Date(0);
-      where.createdAt = Between(epoch, new Date(endTime));
     }
 
     if (operator) {
