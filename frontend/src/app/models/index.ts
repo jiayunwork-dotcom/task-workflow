@@ -55,7 +55,7 @@ export interface Task {
   workflowInstanceId?: string;
   stepId?: string;
   queue: string;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'DEAD_LETTER' | 'CANCELLED';
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'DEAD_LETTER' | 'CANCELLED' | 'TIMEOUT' | 'CLAIMED';
   inputData?: Record<string, any>;
   outputData?: Record<string, any>;
   error?: string;

@@ -5,13 +5,15 @@ export class TaskStatusPipe implements PipeTransform {
   transform(value: string): string {
     const statusMap: Record<string, string> = {
       'PENDING': '等待中',
+      'CLAIMED': '已认领',
       'RUNNING': '执行中',
       'SUCCESS': '成功',
       'FAILED': '失败',
+      'TIMEOUT': '超时',
       'DEAD_LETTER': '死信',
       'CANCELLED': '已取消'
     };
-    return statusMap[value] || value;
+    return statusMap[value] || statusMap[value?.toUpperCase()] || value;
   }
 }
 
@@ -20,18 +22,20 @@ export class StatusColorPipe implements PipeTransform {
   transform(value: string): string {
     const colorMap: Record<string, string> = {
       'PENDING': '#9e9e9e',
+      'CLAIMED': '#0288d1',
       'RUNNING': '#1976d2',
       'SUCCESS': '#388e3c',
       'FAILED': '#d32f2f',
+      'TIMEOUT': '#f57c00',
       'DEAD_LETTER': '#7b1fa2',
-      'CANCELLED': '#f57c00',
+      'CANCELLED': '#616161',
       'ONLINE': '#388e3c',
       'OFFLINE': '#9e9e9e',
       'BUSY': '#1976d2',
       'ACTIVE': '#388e3c',
       'INACTIVE': '#9e9e9e'
     };
-    return colorMap[value] || '#9e9e9e';
+    return colorMap[value] || colorMap[value?.toUpperCase()] || '#9e9e9e';
   }
 }
 

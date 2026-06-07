@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
 import { MatTableModule } from '@angular/material/table';
@@ -233,6 +233,7 @@ export class TasksComponent implements OnInit, OnDestroy {
     { label: '执行中', status: 'RUNNING', count: 0 },
     { label: '成功', status: 'SUCCESS', count: 0 },
     { label: '失败', status: 'FAILED', count: 0 },
+    { label: '超时', status: 'TIMEOUT', count: 0 },
     { label: '死信', status: 'DEAD_LETTER', count: 0 }
   ];
   
@@ -250,7 +251,8 @@ export class TasksComponent implements OnInit, OnDestroy {
   constructor(
     private mockData: MockDataService,
     private realtimeService: RealtimeService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -267,9 +269,15 @@ export class TasksComponent implements OnInit, OnDestroy {
   }
 
   private updateTaskStatus(event: TaskStatusChangedEvent): void {
-    const task = this.tasks.find(t => t.id === event.taskId);
-    if (task) {
-      task.status = event.newStatus.toUpperCase();
+    const index = this.tasks.findIndex(t => t.id === event.taskId);
+    if (index !== -1) {
+      const newStatus = event.newStatus.toUpperCase() as Task['status'];
+      this.tasks[index] = {
+        ...this.tasks[index],
+        status: newStatus
+      };
+      this.tasks = [...this.tasks];
+      this.cdr.detectChanges();
     }
   }
 

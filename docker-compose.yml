@@ -87,10 +87,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: task-workflow-worker
     environment:
       NODE_ENV: production
-      PORT: 3001
+      PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: taskflow

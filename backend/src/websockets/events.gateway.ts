@@ -26,7 +26,8 @@ export interface WorkflowStepChangedPayload {
 @WebSocketGateway({
   namespace: '/',
   cors: {
-    origin: '*',
+    origin: true,
+    credentials: true,
   },
 })
 export class EventsGateway

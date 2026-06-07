@@ -36,16 +36,31 @@ export class RealtimeService implements OnDestroy {
   connect(): void {
     if (this.socket?.connected) return;
 
-    this.socket = io(environment.wsUrl, {
+    const socketOptions: any = {
       transports: ['websocket', 'polling'],
-    });
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+    };
+
+    if (environment.production) {
+      this.socket = io(socketOptions);
+    } else {
+      this.socket = io(environment.wsUrl, socketOptions);
+    }
 
     this.socket.on('connect', () => {
-      console.log('WebSocket connected');
+      console.log('WebSocket connected, socket id:', this.socket?.id);
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('WebSocket disconnected');
+    this.socket.on('connect_error', (error: any) => {
+      console.error('WebSocket connection error:', error.message || error);
+    });
+
+    this.socket.on('disconnect', (reason: string) => {
+      console.log('WebSocket disconnected, reason:', reason);
     });
 
     this.socket.on('task:statusChanged', (data: TaskStatusChangedEvent) => {
